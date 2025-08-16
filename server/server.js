@@ -3,14 +3,15 @@ import cors from 'cors';
 import multer from 'multer';
 import fs from 'fs';
 import { createRequire } from 'module';
-import { RecursiveCharacterTextSplitter } from 'langchain/text_splitter';
-import { GoogleGenerativeAIEmbeddings } from '@langchain/google-genai';
-import { MemoryVectorStore } from 'langchain/vectorstores/memory';
 import dotenv from 'dotenv';
+import { RecursiveCharacterTextSplitter } from 'langchain/text_splitter';
+import { GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI } from '@langchain/google-genai';
+import { MemoryVectorStore } from 'langchain/vectorstores/memory';
+import { ChatPromptTemplate } from '@langchain/core/prompts';
+import { StringOutputParser } from '@langchain/core/output_parsers';
 
 // Load environment variables
 dotenv.config();
-
 const require = createRequire(import.meta.url);
 
 const app = express();
@@ -19,174 +20,224 @@ const port = 3000;
 // Initialize Gemini AI Embeddings (verify API key is loaded)
 const embeddings = new GoogleGenerativeAIEmbeddings({
   apiKey: process.env.GOOGLE_API_KEY,
-  modelName: "embedding-001"
+  modelName: 'embedding-001'
+});
+
+// Use Chat wrapper (handles safety blocks & formatting)
+const llm = new ChatGoogleGenerativeAI({
+  apiKey: process.env.GOOGLE_API_KEY,
+  model: 'gemini-1.5-flash',
+  temperature: 0.2,
+  maxOutputTokens: 512
 });
 
 // Store vector store in memory (will be replaced per upload)
 let vectorStore = null;
+let conversationHistory = [];
+
+// Helper: generate grounded answer using current vectorStore
+async function generateAnswer(query) {
+  if (!vectorStore) throw new Error('Vector store not ready');
+  
+  const relevant = await vectorStore.similaritySearch(query, 4);
+  console.log(`Retrieved ${relevant.length} chunks for query: ${query}`);
+  
+  const context = relevant
+    .map((c, i) => `Source ${i + 1}:\n${c.pageContent}`)
+    .join('\n\n');
+  
+  const convo = conversationHistory.slice(-3)
+    .map(h => `Q: ${h.query}\nA: ${h.answer}`)
+    .join('\n');
+  
+  const promptTemplate = ChatPromptTemplate.fromTemplate(
+`You are a strict grounded QA assistant.
+ONLY answer using the provided context.
+If the answer is not contained, reply exactly: "I cannot find this information in the provided document."
+
+{conversationSection}Context:
+{context}
+
+Question: {question}
+
+Answer:`);
+
+  const filled = await promptTemplate.format({
+    context,
+    question: query,
+    conversationSection: convo ? `Previous conversation:\n${convo}\n\n` : ''
+  });
+
+  console.log('Generating answer with Gemini...');
+  const aiMsg = await llm.invoke(filled);
+  const answer = normalizeAiContent(aiMsg);
+
+  conversationHistory.push({ query, answer });
+  if (conversationHistory.length > 10) conversationHistory = conversationHistory.slice(-10);
+
+  return {
+    answer,
+    retrievedChunks: relevant.length,
+    sources: relevant.map((c, i) => ({
+      id: i + 1,
+      preview: c.pageContent.slice(0, 200) + (c.pageContent.length > 200 ? '...' : '')
+    }))
+  };
+}
 
 app.use(cors());
 app.use(express.json());
 
 const upload = multer({ dest: 'uploads/' });
 
+// Global unhandled rejection logging
+process.on('unhandledRejection', (r) => {
+  console.error('[UnhandledRejection]', r);
+});
+
 // Root route for API health check
-app.get('/', (req, res) => {
-  const hasApiKey = !!process.env.GOOGLE_API_KEY;
-  const hasVectorStore = !!vectorStore;
-  res.json({ 
-    message: 'Finance Document Q&A Server is running!', 
-    endpoints: ['POST /api/upload', 'POST /api/search', 'GET /api/test-embedding'],
-    geminiConfigured: hasApiKey,
-    vectorStoreReady: hasVectorStore
+app.get('/', (_req, res) => {
+  res.json({
+    message: 'Finance Document Q&A Server running',
+    endpoints: ['POST /api/upload', 'POST /api/search', 'GET /api/test-embedding', 'GET /api/test-llm'],
+    geminiConfigured: !!process.env.GOOGLE_API_KEY,
+    vectorStoreReady: !!vectorStore
   });
 });
 
 // Test endpoint to verify embedding setup
-app.get('/api/test-embedding', async (req, res) => {
+app.get('/api/test-embedding', async (_req, res) => {
   try {
-    console.log('Testing embedding API...');
-    const testText = ["Hello world"];
-    const testEmbedding = await embeddings.embedDocuments(testText);
-    res.json({
-      message: 'Embedding test successful',
-      embeddingLength: testEmbedding[0]?.length || 0,
-      success: true
-    });
-  } catch (error) {
-    console.error('Embedding test failed:', error);
-    res.status(500).json({
-      message: 'Embedding test failed',
-      error: error.message,
-      success: false
-    });
+    const out = await embeddings.embedDocuments(['hello world']);
+    res.json({ success: true, length: out[0]?.length || 0 });
+  } catch (e) {
+    console.error('Embedding test failed:', e);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.get('/api/test-llm', async (_req, res) => {
+  try {
+    const answer = await llm.invoke([{ role: 'user', content: 'Reply with the single word OK.' }]);
+    res.json({ success: true, answer: answer.content });
+  } catch (e) {
+    console.error('LLM test failed:', e);
+    res.status(500).json({ success: false, error: e.message });
   }
 });
 
 app.post('/api/upload', upload.single('file'), async (req, res) => {
   try {
-    const file = req.file;
-    const query = req.body.query;
+    if (!req.file) return res.status(400).json({ message: 'No file uploaded.' });
 
-    if (!file) {
-      return res.status(400).json({ message: 'No file uploaded.' });
-    }
-
-    console.log('Received file:', file.originalname);
-    console.log('Received query:', query);
+    const initialQuery = (req.body.query || '').trim();
+    console.log('Received file:', req.file.originalname);
+    console.log('Initial query:', initialQuery || '(none)');
 
     // Lazy-load pdf-parse to avoid module resolution side-effects at startup
     let pdf;
     try {
       pdf = require('pdf-parse');
-    } catch (pdfError) {
-      console.error('Error loading pdf-parse:', pdfError);
-      return res.status(500).json({ message: 'PDF parsing library not available.' });
+    } catch (e) {
+      return res.status(500).json({ message: 'pdf-parse not installed', error: e.message });
     }
 
-    const dataBuffer = fs.readFileSync(file.path);
+    const dataBuffer = fs.readFileSync(req.file.path);
     let pdfData;
     try {
       pdfData = await pdf(dataBuffer);
-    } catch (parseError) {
-      console.error('Error parsing PDF:', parseError);
-      return res.status(500).json({ message: 'Error parsing PDF file. Please ensure it\'s a valid PDF.' });
+    } catch (e) {
+      return res.status(400).json({ message: 'Failed to parse PDF', error: e.message });
     }
-    
-    // --- Chunk the extracted text ---
-    const splitter = new RecursiveCharacterTextSplitter({
-      chunkSize: 1000, // Max characters per chunk
-      chunkOverlap: 150, // Characters to overlap between chunks
-    });
 
-    const chunks = await splitter.splitText(pdfData.text);
-    
-    console.log('--- Text Chunking Complete ---');
-    console.log(`Document split into ${chunks.length} chunks.`);
-    console.log('First chunk:', chunks[0]);
-    
+    // --- Chunk the extracted text ---
+    const splitter = new RecursiveCharacterTextSplitter({ chunkSize: 1000, chunkOverlap: 150 });
+    const chunks = await splitter.splitText(pdfData.text || '');
+
+    console.log(`Chunking complete: ${chunks.length} chunks`);
+
     // --- Create Embeddings and Vector Store ---
-    console.log('--- Creating embeddings and vector store ---');
-    
     try {
-      // Create vector store from text chunks using Gemini embeddings
       vectorStore = await MemoryVectorStore.fromTexts(
         chunks,
-        chunks.map((_, i) => ({ chunkIndex: i })), // metadata for each chunk
+        chunks.map((_, i) => ({ id: i })),
         embeddings
       );
-      
-      console.log('Vector store created successfully with', chunks.length, 'embeddings');
-      console.log('----------------------------');
-
-      res.json({ 
-        message: 'File processed and embeddings created successfully!', 
-        chunkCount: chunks.length,
-        embeddings: vectorStore ? chunks.length : 0,
-        geminiReady: !!process.env.GOOGLE_API_KEY
-      });
-      
-    } catch (embeddingError) {
-      console.error('Error creating embeddings:', embeddingError);
-      console.error('Error details:', embeddingError.stack);
-      res.status(500).json({ 
-        message: 'File chunked but embedding creation failed.',
-        chunkCount: chunks.length,
-        error: embeddingError.message
-      });
+      console.log('Vector store ready');
+    } catch (e) {
+      console.error('Embedding creation failed:', e);
+      return res.status(500).json({ message: 'Embedding creation failed', error: e.message });
     }
-  
-  } catch (error) {
-    console.error('Error processing file:', error);
-    console.error('Error stack:', error.stack);
-    res.status(500).json({ message: 'Error processing file.', error: error.message });
+
+    // --- Generate initial answer if query provided ---
+    let ragPayload = null;
+    if (initialQuery) {
+      try {
+        console.log('Generating initial answer...');
+        ragPayload = await generateAnswer(initialQuery);
+        console.log('Initial answer generated successfully');
+      } catch (genErr) {
+        console.error('Initial answer generation failed:', genErr);
+        ragPayload = { answerError: genErr.message };
+      }
+    }
+
+    const response = {
+      message: 'File processed successfully!',
+      chunkCount: chunks.length,
+      embeddings: chunks.length,
+      initialQuery: initialQuery || null
+    };
+
+    // Add RAG results if available
+    if (ragPayload) {
+      Object.assign(response, ragPayload);
+    }
+
+    res.json(response);
+  } catch (e) {
+    console.error('Upload error:', e);
+    res.status(500).json({ message: 'Server error during upload', error: e.message });
   }
 });
 
-// Test endpoint for vector similarity search
+// Rebuilt RAG endpoint using a LangChain chain
 app.post('/api/search', async (req, res) => {
+  const { query } = req.body || {};
+  if (!vectorStore) return res.status(400).json({ message: 'No document uploaded yet.' });
+  if (!query) return res.status(400).json({ message: 'Query is required.' });
+
+  console.log('RAG query (search endpoint):', query);
+
   try {
-    const { query } = req.body;
-    
-    if (!vectorStore) {
-      return res.status(400).json({ 
-        message: 'No document uploaded yet. Please upload a PDF first.' 
-      });
-    }
-
-    if (!query) {
-      return res.status(400).json({ 
-        message: 'Query is required.' 
-      });
-    }
-
-    console.log('Searching for:', query);
-    
-    // Perform similarity search
-    const results = await vectorStore.similaritySearch(query, 3); // Get top 3 matches
-    
-    console.log(`Found ${results.length} relevant chunks`);
-    results.forEach((result, i) => {
-      console.log(`Chunk ${i + 1}:`, result.pageContent.substring(0, 100) + '...');
-    });
-
+    const result = await generateAnswer(query);
     res.json({
-      message: 'Search completed successfully',
+      message: 'RAG success',
       query,
-      results: results.map((result, i) => ({
-        rank: i + 1,
-        content: result.pageContent,
-        metadata: result.metadata
-      }))
+      ...result
     });
-
-  } catch (error) {
-    console.error('Error during search:', error);
-    res.status(500).json({ message: 'Error during search.', error: error.message });
+  } catch (e) {
+    console.error('RAG error (outer):', e);
+    res.status(500).json({
+      message: 'RAG query failed',
+      error: e.message || String(e)
+    });
   }
 });
+
+// Helper to normalize AI message content
+function normalizeAiContent(aiMsg) {
+  if (!aiMsg) return '';
+  if (typeof aiMsg === 'string') return aiMsg;
+  const c = aiMsg.content;
+  if (Array.isArray(c)) {
+    return c.map(p => (typeof p === 'string' ? p : (p.text || p.content || ''))).join('');
+  }
+  if (typeof c === 'string') return c;
+  return aiMsg.text || '';
+}
 
 app.listen(port, () => {
-  console.log(`Server is running on http://localhost:${port}`);
-  console.log(`Gemini API configured: ${!!process.env.GOOGLE_API_KEY}`);
+  console.log(`Server listening http://localhost:${port}`);
+  console.log(`Gemini configured: ${!!process.env.GOOGLE_API_KEY}`);
 });
