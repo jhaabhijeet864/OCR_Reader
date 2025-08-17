@@ -10,7 +10,8 @@ function App() {
   const [query, setQuery] = useState('');
   const [apiStatus, setApiStatus] = useState('loading');
   const [uploading, setUploading] = useState(false);
-  const [asking, setAsking] = useState(false);
+  // Unified loading state for agent question submission
+  const [isLoading, setIsLoading] = useState(false);
   const [answer, setAnswer] = useState('');
   const [steps, setSteps] = useState([]);
   const [error, setError] = useState(null);
@@ -20,9 +21,17 @@ function App() {
     let cancelled = false;
     (async () => {
       try {
-        const r = await fetch(`${apiBase()}/api/ping`).catch(()=>null);
-        if (!cancelled) setApiStatus(r && r.ok ? 'ok' : 'error');
-      } catch {
+        const r = await fetch(`${apiBase()}/api/ping`);
+        if (!cancelled) {
+          if (r.ok) {
+            setApiStatus('ok');
+          } else {
+            console.warn('Ping failed status', r.status);
+            setApiStatus('error');
+          }
+        }
+      } catch (err) {
+        console.error('Ping network error', err);
         if (!cancelled) setApiStatus('error');
       }
     })();
@@ -67,7 +76,7 @@ function App() {
 
   async function ask() {
     if (!query.trim()) return;
-    setAsking(true);
+    setIsLoading(true);
     setError(null);
     setAnswer('');
     setSteps([]);
@@ -84,7 +93,7 @@ function App() {
     } catch (e) {
       setError(e.message);
     } finally {
-      setAsking(false);
+      setIsLoading(false);
     }
   }
 
@@ -152,12 +161,12 @@ function App() {
             onKeyDown={e => { if (e.key === 'Enter') ask(); }}
         />
         <div className="actions">
-          <button disabled={!lastUploadId || asking} onClick={ask}>
-            {asking ? 'Thinking...' : 'Run Agent'}
+          <button disabled={!lastUploadId || isLoading} onClick={ask}>
+            {isLoading ? 'Agent is thinking…' : 'Run Agent'}
           </button>
           <button
             className="secondary"
-            disabled={asking && !steps.length}
+            disabled={isLoading && !steps.length}
             onClick={() => { setAnswer(''); setSteps([]); setQuery(''); }}
           >
             Clear
@@ -178,7 +187,7 @@ function App() {
         <div className="steps">
           {steps.length === 0 && (
             <div className="empty">
-              {asking ? 'Agent reasoning...' : 'No steps yet. Ask a question.'}
+              {isLoading ? 'Agent reasoning...' : 'No steps yet. Ask a question.'}
             </div>
           )}
           {steps.map((s,i) => (

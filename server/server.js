@@ -45,9 +45,18 @@ app.use(express.json());
 
 const upload = multer({ dest: 'uploads/' });
 
+// Add ping endpoint early for health checks
+app.get('/api/ping', (_req, res) => {
+  res.json({ ok: true, time: Date.now() });
+});
+
 // Global unhandled rejection logging
 process.on('unhandledRejection', (r) => {
   console.error('[UnhandledRejection]', r);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('UNCAUGHT EXCEPTION', err);
 });
 
 // Root route for API health check
