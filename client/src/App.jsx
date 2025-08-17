@@ -168,6 +168,7 @@ function App() {
               onClear={clearResults}
               disabled={!lastUploadId}
               isLoading={isLoading}
+              answer={answer}
             />
           </div>
 

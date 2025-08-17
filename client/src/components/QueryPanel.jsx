@@ -1,7 +1,8 @@
 import React from 'react';
 import styles from './components.module.css';
 
-export default function QueryPanel({ query, setQuery, onAsk, onClear, disabled, isLoading }) {
+// Added `answer` prop to render inline answer section per Task 2
+export default function QueryPanel({ query, setQuery, onAsk, onClear, disabled, isLoading, answer }) {
   return (
     <div className={`glass-panel slide-up ${styles.delay05}`}>
       <h2 className="panel-title"><span className="panel-icon">🤖</span>Ask the AI Agent</h2>
@@ -36,6 +37,14 @@ export default function QueryPanel({ query, setQuery, onAsk, onClear, disabled, 
             <span className={styles.mobileOnly}>🧹</span>
           </button>
         </div>
+
+        {/* Inline Answer Section (Task 2) */}
+        {answer && (
+          <div className="answer-container" aria-live="polite">
+            <h3 className="answer-heading">Answer:</h3>
+            <p className="answer-text">{answer}</p>
+          </div>
+        )}
       </div>
     </div>
   );
