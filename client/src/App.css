@@ -30,6 +30,21 @@
   --grid-gap-lg: 40px;
 }
 
+/* Added dark theme tokens */
+:root {
+  --dark-bg: #0d1117;
+  --text-light: #f1f5f9;
+  --glass-bg: rgba(255,255,255,0.05);
+  --glass-border: rgba(255,255,255,0.15);
+  --border-radius: 24px;
+  --primary-gradient: linear-gradient(135deg,#667eea 0%,#764ba2 50%,#f093fb 100%);
+  --success-gradient: linear-gradient(90deg,#10b981,#34d399);
+  --transition: 0.3s cubic-bezier(.4,0,.2,1);
+  --shadow-soft: 0 4px 18px -4px rgba(0,0,0,0.55), 0 2px 4px rgba(0,0,0,0.4);
+  --shadow-strong: 0 8px 32px -4px rgba(0,0,0,0.7), 0 4px 10px rgba(0,0,0,0.6);
+  color-scheme: dark;
+}
+
 /* Reset & Base */
 * {
   margin: 0;
@@ -49,12 +64,24 @@ body {
   line-height: 1.6;
 }
 
+/* Force dark scheme overriding global light override in index.css */
+html, body { color-scheme: dark !important; }
+
 /* Animated Background */
 .app-container {
   min-height: 100vh;
   position: relative;
   background: var(--dark-bg);
 }
+
+/* Center entire application horizontally */
+.app-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center; /* Center children (basic header + app shell) */
+}
+
+.container.basic-top, .app-shell { width: 100%; }
 
 .app-container::before {
   content: '';
@@ -80,7 +107,7 @@ body {
 /* Main Layout */
 .app-shell {
   max-width: 1200px;
-  margin: 0 auto;
+  margin: 0 auto; /* Keep centered inside flex parent */
   padding: 60px 40px;
   display: grid;
   grid-template-columns: 1fr;
@@ -848,7 +875,9 @@ body {
   gap: 40px; 
   align-items: start; 
   width: 100%;
-  margin: 0 auto;
+  margin: 0 auto; /* Centered grid */
+  max-width: 1280px; /* Constrain overall width */
+  justify-content: center; /* Center the two columns if they shrink */
 }
 
 .workflow-column, .insights-column { 
@@ -856,12 +885,16 @@ body {
   flex-direction: column; 
   gap: 40px; 
   width: 100%;
+  max-width: 560px; /* Provide readable measure and centering */
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .insights-column { 
-  position: sticky; 
-  top: 32px; 
-  height: fit-content; 
+  /* Removed sticky positioning per request */
+  position: static; 
+  top: auto; 
+  height: auto; 
 }
 
 /* Subtle hover refinement */
@@ -959,5 +992,77 @@ body {
   .answer-container { padding: 16px 18px; }
   .answer-heading { font-size: 1rem; }
   .answer-text { font-size: 0.9rem; }
+}
+
+/* ================= Basic Styles (Task 3) ================= */
+.container.basic-top {
+  max-width: 800px;
+  margin: 2rem auto 0 auto;
+  padding: 2rem 1.5rem 0 1.5rem;
+  text-align: center;
+  font-family: system-ui, Inter, sans-serif;
+}
+.basic-header h1 {
+  margin: 0 0 0.5rem;
+  font-size: 2rem;
+  font-weight: 600;
+  letter-spacing: .5px;
+  color: #ffffff;
+}
+.basic-header p {
+  margin: 0 0 1.5rem;
+  font-size: 1rem;
+  opacity: 0.75;
+  color: #ffffff;
+}
+@media (max-width: 600px) {
+  .basic-header h1 { font-size: 1.6rem; }
+  .basic-header p { font-size: 0.9rem; }
+}
+
+/* ================= Enhanced Border & Shadow Definition ================= */
+/* Sharper borders + layered shadows for clearer panel separation */
+.glass-panel,
+.answer-card,
+.answer-container,
+.upload-zone,
+.step-item {
+  border-color: rgba(255,255,255,0.28) !important; /* Crisper border */
+  box-shadow: 0 2px 4px rgba(0,0,0,0.55),
+              0 8px 24px -4px rgba(0,0,0,0.55),
+              0 0 0 1px rgba(255,255,255,0.06); /* Subtle outline */
+}
+
+/* Preserve dashed style for upload zone while strengthening contrast */
+.upload-zone { border-style: dashed; }
+
+/* Add a soft inner highlight for depth */
+.glass-panel::after,
+.answer-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: inherit;
+  mix-blend-mode: overlay;
+}
+
+/* Hover amplification (slightly stronger lift) */
+.glass-panel:hover,
+.answer-card:hover,
+.upload-zone:hover {
+  box-shadow: 0 4px 8px rgba(0,0,0,0.6),
+              0 14px 36px -6px rgba(0,0,0,0.65),
+              0 0 0 1px rgba(255,255,255,0.08);
+}
+
+/* High-contrast fallback for users requesting reduced motion (still want clarity) */
+@media (prefers-reduced-motion: reduce) {
+  .glass-panel,
+  .answer-card,
+  .answer-container,
+  .upload-zone,
+  .step-item { transition: none; }
 }
 

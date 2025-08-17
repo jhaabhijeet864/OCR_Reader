@@ -142,6 +142,13 @@ function App() {
 
   return (
     <div className="app-container">
+      {/* Simple basic header (Task 3) */}
+      <div className="container basic-top">
+        <header className="basic-header">
+          <h1>Financial Document Agent</h1>
+          <p>Upload a PDF invoice and ask a question about its content.</p>
+        </header>
+      </div>
       <div className="app-shell">
         <Header />
         <div className="layout-grid">
