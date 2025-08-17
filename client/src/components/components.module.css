@@ -1,0 +1,64 @@
+.delay05 {
+  animation-delay: 0.05s;
+}
+.delay10 {
+  animation-delay: 0.1s;
+}
+.delay15 {
+  animation-delay: 0.15s;
+}
+.alignEnd {
+  display: flex;
+  justify-content: flex-end;
+}
+.panelCompact {
+  margin-bottom: 8px;
+}
+.hiddenOnCollapse {
+  display: none;
+}
+
+/* Responsive utility classes */
+.mobileOnly {
+  display: none;
+}
+
+.desktopOnly {
+  display: initial;
+}
+
+.tabletCentered {
+  text-align: center;
+}
+
+/* Media queries for responsive utilities */
+@media (max-width: 768px) {
+  .alignEnd {
+    justify-content: center;
+    margin-top: 16px;
+  }
+  
+  .mobileOnly {
+    display: initial;
+  }
+  
+  .desktopOnly {
+    display: none;
+  }
+  
+  .panelCompact {
+    margin-bottom: 4px;
+  }
+}
+
+/* Small mobile styles */
+@media (max-width: 480px) {
+  .alignEnd {
+    margin-top: 12px;
+  }
+  
+  .mobileStackFull {
+    width: 100%;
+    display: block;
+  }
+}
