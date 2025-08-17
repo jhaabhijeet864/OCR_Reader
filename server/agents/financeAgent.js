@@ -20,13 +20,13 @@ export async function createFinanceAgent(llm, getVectorStore, conversationHistor
 
     // Create the agent using LangChain's agent framework
     const executor = await initializeAgentExecutorWithOptions(
-      tools,
+      tools, // DocumentSearchTool + CurrencyConverterTool
       llm,
       {
         agentType: "chat-zero-shot-react-description",
-        verbose: true, // Log the agent's thought process (for debugging)
-        maxIterations: 5, // Prevent infinite loops
-        returnIntermediateSteps: true // Return the reasoning chain for UI display
+        verbose: true, // Shows thought process
+        maxIterations: 5,
+        returnIntermediateSteps: true
       }
     );
 

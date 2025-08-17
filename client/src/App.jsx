@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import './App.css';
 
 const API_PORT = 3000;
@@ -10,7 +10,6 @@ function App() {
   const [query, setQuery] = useState('');
   const [apiStatus, setApiStatus] = useState('loading');
   const [uploading, setUploading] = useState(false);
-  // Unified loading state for agent question submission
   const [isLoading, setIsLoading] = useState(false);
   const [answer, setAnswer] = useState('');
   const [steps, setSteps] = useState([]);
@@ -23,9 +22,8 @@ function App() {
       try {
         const r = await fetch(`${apiBase()}/api/ping`);
         if (!cancelled) {
-          if (r.ok) {
-            setApiStatus('ok');
-          } else {
+          if (r.ok) setApiStatus('ok');
+          else {
             console.warn('Ping failed status', r.status);
             setApiStatus('error');
           }
@@ -38,33 +36,51 @@ function App() {
     return () => { cancelled = true; };
   }, []);
 
-  function onFileInput(e) {
+  const handleFileInput = (e) => {
     if (e.target.files?.[0]) {
       setFile(e.target.files[0]);
       setAnswer('');
       setSteps([]);
+      setError(null);
     }
-  }
+  };
 
-  function onDrop(e) {
+  const handleDrop = (e) => {
     e.preventDefault();
     setDragging(false);
     if (e.dataTransfer.files?.[0]) {
       setFile(e.dataTransfer.files[0]);
       setAnswer('');
       setSteps([]);
+      setError(null);
     }
-  }
+  };
 
-  async function upload() {
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setDragging(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    setDragging(false);
+  };
+
+  const uploadFile = async () => {
     if (!file) return;
     setUploading(true);
     setError(null);
+    
     try {
       const fd = new FormData();
       fd.append('file', file);
-      const r = await fetch(`${apiBase()}/api/upload`, { method:'POST', body: fd });
+      const r = await fetch(`${apiBase()}/api/upload`, { 
+        method: 'POST', 
+        body: fd 
+      });
+      
       if (!r.ok) throw new Error(await r.text());
+      
       const data = await r.json();
       setLastUploadId(data?.uploadId || Date.now().toString());
     } catch (e) {
@@ -72,22 +88,25 @@ function App() {
     } finally {
       setUploading(false);
     }
-  }
+  };
 
-  async function ask() {
+  const askAgent = async () => {
     if (!query.trim()) return;
     setIsLoading(true);
     setError(null);
     setAnswer('');
     setSteps([]);
+    
     try {
       const r = await fetch(`${apiBase()}/api/agent`, {
-        method:'POST',
-        headers:{ 'Content-Type':'application/json' },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query })
       });
+      
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || 'Agent error');
+      
       setAnswer(data.answer || '(No answer)');
       setSteps(data.agentSteps || []);
     } catch (e) {
@@ -95,122 +114,228 @@ function App() {
     } finally {
       setIsLoading(false);
     }
-  }
+  };
 
-  const statusClass = apiStatus === 'ok' ? 'ok' : apiStatus === 'error' ? 'err' : 'loading';
+  const clearResults = () => {
+    setAnswer('');
+    setSteps([]);
+    setQuery('');
+    setError(null);
+  };
+
+  const resetAll = () => {
+    setFile(null);
+    setLastUploadId(null);
+    clearResults();
+  };
+
+  const statusClass = apiStatus === 'ok' ? 'ok' : apiStatus === 'error' ? 'error' : 'loading';
+  const hasResults = answer || steps.length > 0;
 
   return (
-    <div className="app-shell">
-      <div className="header">
-        <h1>Finance AI Workspace</h1>
-        <div className="badges">
-          <span className="badge">🧠 Agent</span>
-          <span className="badge">📄 Search</span>
-          <span className="badge">💱 FX</span>
-        </div>
-      </div>
-
-      <div className="panel">
-        <h2>1. Upload Invoice PDF</h2>
-        <div
-          className={`upload-zone ${dragging ? 'drag':''}`}
-          onDragOver={e => { e.preventDefault(); setDragging(true); }}
-          onDragLeave={e => { e.preventDefault(); setDragging(false); }}
-          onDrop={onDrop}
-          onClick={() => document.getElementById('fileInput').click()}
-        >
-          <div className="icon">📤</div>
-          <div style={{fontSize:15, fontWeight:600}}>
-            {file ? file.name : 'Drag & drop PDF or click to browse'}
+    <div className="app-container">
+      <div className="app-shell">
+        {/* Header */}
+        <header className="header fade-in">
+          <h1 className="header-title">Finance AI Workspace</h1>
+          <p className="header-subtitle">
+            Intelligent document analysis with multi-tool AI reasoning
+          </p>
+          <div className="feature-badges">
+            <span className="badge">
+              🧠 Smart Agent
+            </span>
+            <span className="badge">
+              📄 Document Search
+            </span>
+            <span className="badge">
+              💱 Currency Converter
+            </span>
+            <span className="badge">
+              ⚡ Real-time Processing
+            </span>
           </div>
-          <div className="helper">Only PDF. Parsed & chunked for semantic search.</div>
-          <input id="fileInput" type="file" accept="application/pdf" onChange={onFileInput} />
-        </div>
+        </header>
 
-        <div className="form-section">
-          <div className="actions">
-            <button disabled={!file || uploading} onClick={upload}>
-              {uploading ? 'Uploading...' : (lastUploadId ? 'Re-Upload' : 'Upload')}
-            </button>
-            <button
-              className="secondary"
-              disabled={!lastUploadId || uploading}
-              onClick={() => { setFile(null); setLastUploadId(null); setAnswer(''); setSteps([]); }}
-            >
-              Reset
-            </button>
-          </div>
-          <div className="status-line">
-            <span className={`status-dot ${statusClass}`}></span>
-            <span>API: {apiStatus}</span>
-            {lastUploadId && <span style={{color:'#2563eb'}}>Vector store ready</span>}
-            {error && <span style={{color:'#dc2626'}}>{error}</span>}
-          </div>
-        </div>
-      </div>
-
-      <div className="panel">
-        <h2>2. Ask the Agent</h2>
-        <label className="field-label" htmlFor="queryInput">Query</label>
-        <input
-          id="queryInput"
-          className="query"
-            placeholder="What is the total amount and its value in INR?"
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') ask(); }}
-        />
-        <div className="actions">
-          <button disabled={!lastUploadId || isLoading} onClick={ask}>
-            {isLoading ? 'Agent is thinking…' : 'Run Agent'}
-          </button>
-          <button
-            className="secondary"
-            disabled={isLoading && !steps.length}
-            onClick={() => { setAnswer(''); setSteps([]); setQuery(''); }}
+        {/* Upload Panel */}
+        <div className="glass-panel slide-up">
+          <h2 className="panel-title">
+            <span className="panel-icon">📤</span>
+            Upload Invoice PDF
+          </h2>
+          
+          <div
+            className={`upload-zone ${dragging ? 'drag-active' : ''}`}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            onClick={() => document.getElementById('fileInput').click()}
           >
-            Clear
-          </button>
-        </div>
-        {answer && (
-          <div className="results" style={{marginTop:24}}>
-            <div className="answer-box">
-              <h3>Answer</h3>
-              <div>{answer}</div>
+            <div className="upload-icon">
+              {file ? '✅' : '📁'}
+            </div>
+            <div className="upload-text">
+              {file ? `Selected: ${file.name}` : 'Drop PDF here or click to browse'}
+            </div>
+            <div className="upload-hint">
+              Supports PDF files up to 10MB • Extracts text for AI analysis
+            </div>
+            <input
+              id="fileInput"
+              type="file"
+              accept="application/pdf"
+              onChange={handleFileInput}
+            />
+          </div>
+
+          <div className="form-section">
+            <div className="btn-group">
+              <button
+                className={`btn btn-primary ${uploading ? 'btn-loading' : ''}`}
+                disabled={!file || uploading}
+                onClick={uploadFile}
+              >
+                {uploading ? 'Processing...' : lastUploadId ? 'Re-Upload' : 'Upload & Process'}
+              </button>
+              <button
+                className="btn btn-secondary"
+                disabled={!lastUploadId || uploading}
+                onClick={resetAll}
+              >
+                🗑️ Reset
+              </button>
+            </div>
+            
+            <div className="status-line">
+              <span className={`status-dot ${statusClass}`}></span>
+              <span>API: {apiStatus}</span>
+              {lastUploadId && (
+                <span style={{color: '#48bb78', fontWeight: 500}}>
+                  ✅ Vector store ready
+                </span>
+              )}
+              {error && (
+                <span style={{color: '#f56565', fontWeight: 500}}>
+                  ❌ {error}
+                </span>
+              )}
             </div>
           </div>
-        )}
-      </div>
+        </div>
 
-      <div className="panel" style={{gridColumn:'1 / -1'}}>
-        <h2>Agent Steps</h2>
-        <div className="steps">
-          {steps.length === 0 && (
-            <div className="empty">
-              {isLoading ? 'Agent reasoning...' : 'No steps yet. Ask a question.'}
+        {/* Query Panel */}
+        <div className="glass-panel slide-up" style={{animationDelay: '0.1s'}}>
+          <h2 className="panel-title">
+            <span className="panel-icon">🤖</span>
+            Ask the AI Agent
+          </h2>
+          
+          <div className="form-section">
+            <label className="form-label" htmlFor="queryInput">
+              Your Question
+            </label>
+            <input
+              id="queryInput"
+              className="form-input"
+              placeholder="What is the total amount and its value in INR?"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) askAgent(); }}
+            />
+            
+            <div className="btn-group">
+              <button
+                className={`btn btn-primary ${isLoading ? 'btn-loading' : ''}`}
+                disabled={!lastUploadId || isLoading}
+                onClick={askAgent}
+              >
+                {isLoading ? 'AI Thinking...' : '🚀 Run Agent'}
+              </button>
+              <button
+                className="btn btn-secondary"
+                disabled={isLoading}
+                onClick={clearResults}
+              >
+                🧹 Clear
+              </button>
+            </div>
+          </div>
+
+          {/* Results */}
+          {hasResults && (
+            <div className="results-container fade-in">
+              {answer && (
+                <div className="answer-card">
+                  <div className="answer-header">
+                    <span className="panel-icon">💡</span>
+                    <h3 className="answer-title">AI Response</h3>
+                  </div>
+                  <div className="answer-content">{answer}</div>
+                </div>
+              )}
             </div>
           )}
-          {steps.map((s,i) => (
-            <div className="step" key={i}>
-              <h4>Step {i+1}: {s.action || s.tool || 'Action'}</h4>
-              {s.toolInput && <div style={{marginBottom:6}}>
-                <strong>Input:</strong> <code>{JSON.stringify(s.toolInput)}</code>
-              </div>}
-              {s.observation && <div>
-                <strong>Output:</strong>
-                <div style={{marginTop:4}}><code>{truncate(s.observation, 420)}</code></div>
-              </div>}
-              {s.output && !s.observation && <div>
-                <strong>Output:</strong>
-                <div style={{marginTop:4}}><code>{truncate(s.output, 420)}</code></div>
-              </div>}
-            </div>
-          ))}
         </div>
-      </div>
 
-      <div className="footer">
-        Finance AI Workspace • Demo • {new Date().getFullYear()}
+        {/* Agent Steps Panel */}
+        <div className="glass-panel steps-panel slide-up" style={{animationDelay: '0.2s'}}>
+          <h2 className="panel-title">
+            <span className="panel-icon">🔍</span>
+            Agent Reasoning Steps
+          </h2>
+          
+          <div className="steps-container">
+            {steps.length === 0 ? (
+              <div className="empty-state">
+                <div className="empty-icon">
+                  {isLoading ? '⏳' : '💭'}
+                </div>
+                <div className="empty-text">
+                  {isLoading ? 'Agent is analyzing...' : 'Ask a question to see AI reasoning'}
+                </div>
+              </div>
+            ) : (
+              steps.map((step, index) => (
+                <div key={index} className="step-item fade-in" style={{animationDelay: `${index * 0.1}s`}}>
+                  <div className="step-header">
+                    <div className="step-number">{index + 1}</div>
+                    <div className="step-title">
+                      {step.action || step.tool || 'Processing'}
+                    </div>
+                  </div>
+                  
+                  {step.input && (
+                    <div style={{marginBottom: 12}}>
+                      <strong style={{color: '#667eea'}}>Input:</strong>
+                      <div className="step-content">
+                        {typeof step.input === 'string' ? step.input : JSON.stringify(step.input, null, 2)}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {(step.output || step.observation) && (
+                    <div>
+                      <strong style={{color: '#48bb78'}}>Output:</strong>
+                      <div className="step-content">
+                        {truncate(step.output || step.observation, 500)}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <footer className="footer">
+          <div>
+            Finance AI Workspace • Built with React + LangChain + Gemini AI
+          </div>
+          <div style={{marginTop: 8, opacity: 0.6}}>
+            Showcase Project • {new Date().getFullYear()}
+          </div>
+        </footer>
       </div>
     </div>
   );
@@ -218,7 +343,7 @@ function App() {
 
 function truncate(str, max) {
   if (!str) return '';
-  return str.length > max ? str.slice(0, max) + '…' : str;
+  return str.length > max ? str.slice(0, max) + '...' : str;
 }
 
 export default App;

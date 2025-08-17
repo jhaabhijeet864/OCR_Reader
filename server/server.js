@@ -280,13 +280,12 @@ app.post('/api/agent', async (req, res) => {
     
     // Format and return the response
     res.json({
-  message: 'Agent finished successfully!',
+  message: 'Agent finished successfully!', // ✅ Correct message
       query,
       answer: result.output,
-      // Include reasoning steps for UI visualization
       agentSteps: result.intermediateSteps?.map(step => ({
         action: step.action.tool,
-        input: step.action.toolInput,
+        input: step.action.toolInput, 
         output: step.observation
       })) || []
     });
