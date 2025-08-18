@@ -1,75 +1,137 @@
-:root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-  /* Force light mode */
-  color-scheme: light;
-  color: #2c3e50;
-  background-color: #f8f9fa;
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
 
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+@layer base {
+  :root {
+    --background: 248 250% 99%;
+    --foreground: 218 25% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 218 25% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 218 25% 15%;
+
+    --primary: 271 85% 45%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 215 25% 25%;
+
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 20% 45%;
+
+    --accent: 330 73% 35%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 343 79% 45%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 215 15% 88%;
+    --input: 215 15% 92%;
+    --ring: 271 85% 45%;
+
+    --financial-success: 142 76% 36%;
+    --financial-warning: 45 93% 47%;
+    --financial-error: 343 79% 45%;
+    --financial-info: 271 85% 55%;
+    
+    --gradient-primary: linear-gradient(135deg, hsl(271 85% 35%), hsl(330 73% 35%));
+    --gradient-secondary: linear-gradient(135deg, hsl(210 40% 96%), hsl(215 15% 92%));
+    --gradient-hero: linear-gradient(135deg, hsl(271 85% 25%) 0%, hsl(330 73% 25%) 50%, hsl(343 79% 35%) 100%);
+    
+    --shadow-elegant: 0 4px 20px -2px hsl(30 11% 4% / 0.08);
+    --shadow-financial: 0 8px 30px -4px hsl(271 85% 25% / 0.12);
+    
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 0 0% 98%;
+
+    --sidebar-foreground: 240 5.3% 26.1%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 0 0% 0%;
+    --foreground: 210 40% 95%;
+
+    --card: 210 53% 11%;
+    --card-foreground: 210 40% 95%;
+
+    --popover: 210 53% 11%;
+    --popover-foreground: 210 40% 95%;
+
+    --primary: 271 85% 55%;
+    --primary-foreground: 30 11% 4%;
+
+    --secondary: 210 53% 15%;
+    --secondary-foreground: 210 40% 90%;
+
+    --muted: 210 53% 15%;
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 330 73% 45%;
+    --accent-foreground: 30 11% 4%;
+
+    --destructive: 343 79% 55%;
+    --destructive-foreground: 30 11% 4%;
+
+    --border: 210 53% 18%;
+    --input: 210 53% 16%;
+    --ring: 271 85% 55%;
+
+    --financial-success: 142 76% 55%;
+    --financial-warning: 45 93% 65%;
+    --financial-error: 343 79% 55%;
+    --financial-info: 271 85% 65%;
+    
+    --gradient-primary: linear-gradient(135deg, hsl(271 85% 35%), hsl(330 73% 35%));
+    --gradient-secondary: linear-gradient(135deg, hsl(210 53% 11%), hsl(210 53% 15%));
+    --gradient-hero: linear-gradient(135deg, hsl(30 11% 4%) 0%, hsl(271 85% 25%) 30%, hsl(330 73% 25%) 70%, hsl(343 79% 35%) 100%);
+    
+    --shadow-elegant: 0 4px 20px -2px hsl(30 11% 2% / 0.6);
+    --shadow-financial: 0 8px 30px -4px hsl(271 85% 15% / 0.4);
+
+    --sidebar-background: 210 53% 8%;
+    --sidebar-foreground: 210 40% 90%;
+    --sidebar-primary: 271 85% 55%;
+    --sidebar-primary-foreground: 30 11% 4%;
+    --sidebar-accent: 210 53% 12%;
+    --sidebar-accent-foreground: 210 40% 90%;
+    --sidebar-border: 210 53% 18%;
+    --sidebar-ring: 271 85% 55%;
+  }
 }
 
-a {
-  font-weight: 500;
-  color: #007acc;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #0056b3;
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
 }
 
-body {
-  margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
-  background-color: #f8f9fa;
-  color: #2c3e50;
-}
-
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
-  color: #2c3e50;
-}
-
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #007acc;
-  color: white;
-  cursor: pointer;
-  transition: background-color 0.25s;
-}
-button:hover {
-  background-color: #0056b3;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
-}
-
-/* Remove dark mode overrides */
-* {
-  color-scheme: light !important;
-}
-
-input {
-  color: #2c3e50 !important;
-  background-color: white !important;
-}
-
-/* Ensure all text is visible */
-p, div, span, h1, h2, h3, h4, h5, h6 {
-  color: #2c3e50;
+/* Apply dark theme by default */
+html {
+  @apply dark;
 }
