@@ -1,20 +1,10 @@
 import { ArrowRight, FileText, Brain, Calculator } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import financialHero from "@/assets/financial-hero.jpg";
 
 const HeroSection = () => {
   return (
-    <section className="relative bg-gradient-hero text-white py-20 overflow-hidden">
-      <div className="absolute inset-0">
-        <img 
-          src={financialHero} 
-          alt="Financial analysis dashboard"
-          className="w-full h-full object-cover opacity-20"
-        />
-        <div className="absolute inset-0 bg-gradient-hero/80"></div>
-      </div>
-      
-      <div className="container mx-auto px-6 relative z-10">
+    <section className="relative z-10 bg-black/30 text-white py-20 overflow-hidden backdrop-blur-[2px]">
+      <div className="container mx-auto px-6">
         <div className="max-w-4xl mx-auto text-center">
           <h1 className="text-5xl md:text-6xl font-bold mb-6 leading-tight">
             AI-Powered Financial

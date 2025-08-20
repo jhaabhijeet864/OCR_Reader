@@ -13,10 +13,24 @@ class DocumentSearchTool extends Tool {
 
   async _call(query) {
     try {
+      // Get the vector store using the function reference
       const vectorStore = this.getVectorStore();
-      if (!vectorStore) return 'Error: No document loaded. Upload a PDF first.';
-
+      
+      // Validate that the vector store exists and is properly initialized
+      if (!vectorStore) {
+        console.error("Vector store is null or undefined in DocumentSearchTool");
+        return 'Error: No document loaded. Upload a PDF first.';
+      }
+      
+      console.log("Vector store check in DocumentSearchTool:", 
+        vectorStore ? "Found" : "Not Found", 
+        "Type:", typeof vectorStore);
+      
+      // Perform similarity search with debugging
+      console.log("Attempting similarity search with query:", query);
       const relevant = await vectorStore.similaritySearch(query, 4);
+      console.log(`Found ${relevant.length} relevant passages`);
+      
       const context = relevant.map((c, i) => `Source ${i + 1}:\n${c.pageContent}`).join('\n\n');
       const convo = this.conversationHistoryRef.slice(-3).map(h => `Q: ${h.query}\nA: ${h.answer}`).join('\n');
 

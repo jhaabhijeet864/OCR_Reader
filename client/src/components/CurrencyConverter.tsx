@@ -1,15 +1,69 @@
 import { useState, useEffect } from "react";
-import { RefreshCw, TrendingUp } from "lucide-react";
+import { RefreshCw, TrendingUp, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+import { useMutation } from "@tanstack/react-query";
+import { handleApiError } from "@/lib/api";
+
+// Define type for currency conversion response
+interface CurrencyConversionResponse {
+  convertedAmount: number;
+  rate: number;
+  fromCurrency: string;
+  toCurrency: string;
+}
 
 const CurrencyConverter = () => {
   const [usdAmount, setUsdAmount] = useState("");
   const [inrAmount, setInrAmount] = useState("");
-  const [exchangeRate, setExchangeRate] = useState(83.12); // Mock rate
+  const [exchangeRate, setExchangeRate] = useState(83.12);
   const [lastUpdated, setLastUpdated] = useState(new Date());
+  const { toast } = useToast();
+
+  // Currency conversion API call
+  const { mutate: convertCurrency, isPending: isConverting } = useMutation({
+    mutationFn: async (amount: string): Promise<CurrencyConversionResponse> => {
+      const response = await fetch('http://localhost:3000/api/test-currency-tool', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ amount, fromCurrency: 'USD', toCurrency: 'INR' })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Currency conversion failed');
+      }
+      
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setExchangeRate(data.rate || 83.12);
+      setLastUpdated(new Date());
+      
+      // Update the INR value based on current USD input
+      if (usdAmount) {
+        const converted = (parseFloat(usdAmount) * data.rate).toFixed(2);
+        setInrAmount(converted);
+      }
+      
+      toast({
+        title: "Exchange rate updated",
+        description: `Current rate: 1 USD = ${data.rate} INR`,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to update rate",
+        description: handleApiError(error),
+        variant: "destructive",
+      });
+    }
+  });
 
   useEffect(() => {
     if (usdAmount) {
@@ -35,18 +89,25 @@ const CurrencyConverter = () => {
   };
 
   const refreshRate = () => {
-    // Simulate rate refresh
-    const newRate = 83.12 + (Math.random() - 0.5) * 2;
-    setExchangeRate(Number(newRate.toFixed(2)));
-    setLastUpdated(new Date());
+    // Use the real API to get the current rate
+    convertCurrency(usdAmount || "100");
   };
 
   return (
     <Card className="p-6 shadow-elegant">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold text-foreground">Currency Converter</h3>
-        <Button variant="outline" size="sm" onClick={refreshRate}>
-          <RefreshCw className="h-4 w-4 mr-2" />
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={refreshRate}
+          disabled={isConverting}
+        >
+          {isConverting ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <RefreshCw className="h-4 w-4 mr-2" />
+          )}
           Refresh
         </Button>
       </div>

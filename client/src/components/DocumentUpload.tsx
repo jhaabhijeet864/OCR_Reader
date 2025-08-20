@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Upload, FileText, X } from "lucide-react";
+import { Upload, FileText, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { useUploadDocument, handleApiError } from "@/lib/api";
 
 interface UploadedDocument {
   id: string;
@@ -15,12 +16,14 @@ const DocumentUpload = () => {
   const [documents, setDocuments] = useState<UploadedDocument[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const { toast } = useToast();
+  const { mutate: uploadDocument, isPending } = useUploadDocument();
 
   const handleFileUpload = (files: FileList | null) => {
     if (!files) return;
 
     Array.from(files).forEach((file) => {
       if (file.type === "application/pdf") {
+        // Add the document to the UI immediately for better UX
         const newDoc: UploadedDocument = {
           id: Date.now().toString() + Math.random(),
           name: file.name,
@@ -28,10 +31,28 @@ const DocumentUpload = () => {
           uploadedAt: new Date(),
         };
         setDocuments((prev) => [...prev, newDoc]);
-        toast({
-          title: "Document uploaded",
-          description: `${file.name} has been uploaded successfully.`,
-        });
+        
+        // Upload to the server
+        uploadDocument(
+          { file },
+          {
+            onSuccess: (data) => {
+              toast({
+                title: "Document processed",
+                description: `${file.name} has been uploaded and processed: ${data.chunkCount} chunks created.`,
+              });
+            },
+            onError: (error) => {
+              // Remove the document from the UI if upload fails
+              setDocuments((prev) => prev.filter(doc => doc.id !== newDoc.id));
+              toast({
+                title: "Upload failed",
+                description: handleApiError(error),
+                variant: "destructive",
+              });
+            }
+          }
+        );
       } else {
         toast({
           title: "Invalid file type",
@@ -73,27 +94,43 @@ const DocumentUpload = () => {
         onDragLeave={() => setIsDragOver(false)}
         onDrop={handleDrop}
       >
-        <Upload className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-        <p className="text-foreground font-medium mb-2">
-          Drop your financial documents here
-        </p>
-        <p className="text-muted-foreground text-sm mb-4">
-          or click to browse files (PDF only)
-        </p>
-        <Button
-          variant="outline"
-          onClick={() => document.getElementById("file-input")?.click()}
-        >
-          Browse Files
-        </Button>
-        <input
-          id="file-input"
-          type="file"
-          accept=".pdf"
-          multiple
-          className="hidden"
-          onChange={(e) => handleFileUpload(e.target.files)}
-        />
+        {isPending ? (
+          <div className="flex flex-col items-center justify-center">
+            <Loader2 className="h-12 w-12 text-primary mx-auto mb-4 animate-spin" />
+            <p className="text-foreground font-medium mb-2">
+              Processing document...
+            </p>
+            <p className="text-muted-foreground text-sm">
+              This may take a moment depending on the file size
+            </p>
+          </div>
+        ) : (
+          <>
+            <Upload className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <p className="text-foreground font-medium mb-2">
+              Drop your financial documents here
+            </p>
+            <p className="text-muted-foreground text-sm mb-4">
+              or click to browse files (PDF only)
+            </p>
+            <Button
+              variant="outline"
+              onClick={() => document.getElementById("file-input")?.click()}
+              disabled={isPending}
+            >
+              Browse Files
+            </Button>
+            <input
+              id="file-input"
+              type="file"
+              accept=".pdf"
+              multiple
+              className="hidden"
+              onChange={(e) => handleFileUpload(e.target.files)}
+              disabled={isPending}
+            />
+          </>
+        )}
       </div>
 
       {documents.length > 0 && (

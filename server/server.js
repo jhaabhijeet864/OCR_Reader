@@ -34,11 +34,17 @@ const llm = new ChatGoogleGenerativeAI({
 
 // Store vector store in memory (will be replaced per upload)
 let vectorStore = null;
-let conversationHistory = [];
-let documentSearchTool = null; // NEW
-let agentExecutor = null; // NEW
+// Initialize conversation history as an array that can be referenced and modified
+const conversationHistory = [];
+let documentSearchTool = null;
+let agentExecutor = null;
 
-// Legacy generateAnswer helper removed after agent integration cleanup.
+// Create a function that returns the current vector store
+// This ensures the tools always access the latest version
+const getVectorStore = () => {
+  console.log("getVectorStore called, vectorStore is:", vectorStore ? "defined" : "undefined");
+  return vectorStore;
+};
 
 app.use(cors());
 app.use(express.json());
@@ -47,7 +53,19 @@ const upload = multer({ dest: 'uploads/' });
 
 // Add ping endpoint early for health checks
 app.get('/api/ping', (_req, res) => {
+  console.log('[RouteHit] /api/ping');
   res.json({ ok: true, time: Date.now() });
+});
+
+// Lightweight status for client debugging
+app.get('/api/status', (_req, res) => {
+  console.log('[RouteHit] /api/status');
+  res.json({
+    vectorStoreReady: !!vectorStore,
+    agentReady: !!agentExecutor,
+    documentSearchTool: !!documentSearchTool,
+    conversationTurns: conversationHistory.length
+  });
 });
 
 // Global unhandled rejection logging
@@ -61,6 +79,7 @@ process.on('uncaughtException', (err) => {
 
 // Root route for API health check
 app.get('/', (_req, res) => {
+  console.log('[RouteHit] /');
   res.json({
     message: 'Finance Document Q&A Server running',
     endpoints: ['POST /api/upload', 'POST /api/search', 'GET /api/test-embedding', 'GET /api/test-llm'],
@@ -71,6 +90,7 @@ app.get('/', (_req, res) => {
 
 // Test endpoint to verify embedding setup
 app.get('/api/test-embedding', async (_req, res) => {
+  console.log('[RouteHit] /api/test-embedding');
   try {
     const out = await embeddings.embedDocuments(['hello world']);
     res.json({ success: true, length: out[0]?.length || 0 });
@@ -81,6 +101,7 @@ app.get('/api/test-embedding', async (_req, res) => {
 });
 
 app.get('/api/test-llm', async (_req, res) => {
+  console.log('[RouteHit] /api/test-llm');
   try {
     const answer = await llm.invoke([{ role: 'user', content: 'Reply with the single word OK.' }]);
     res.json({ success: true, answer: answer.content });
@@ -91,6 +112,7 @@ app.get('/api/test-llm', async (_req, res) => {
 });
 
 app.get('/api/test-currency-tool', async (_req, res) => {
+  console.log('[RouteHit] /api/test-currency-tool');
   try {
     console.log('Testing currency converter tool...');
     
@@ -119,6 +141,7 @@ app.get('/api/test-currency-tool', async (_req, res) => {
 });
 
 app.get('/api/test-agent', async (_req, res) => {
+  console.log('[RouteHit] /api/test-agent');
   try {
     if (!agentExecutor) {
       return res.status(400).json({
@@ -154,6 +177,7 @@ app.get('/api/test-agent', async (_req, res) => {
 });
 
 app.post('/api/upload', upload.single('file'), async (req, res) => {
+  console.log('[RouteHit] POST /api/upload');
   try {
     if (!req.file) return res.status(400).json({ message: 'No file uploaded.' });
 
@@ -184,16 +208,19 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
 
     // --- Create Embeddings and Vector Store ---
     try {
-      // Create vector store and document search tool
+      console.log("Creating vector store from", chunks.length, "chunks");
+      // Create vector store
       vectorStore = await MemoryVectorStore.fromTexts(
         chunks,
         chunks.map((_, i) => ({ id: i })),
         embeddings
       );
       
-      // Create document search tool
+      console.log("Vector store created successfully");
+      
+      // Create document search tool with the getter function
       documentSearchTool = new DocumentSearchTool(
-        () => vectorStore,
+        getVectorStore, // Pass the function that returns the current vector store
         llm, 
         conversationHistory
       );
@@ -201,9 +228,12 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
       // Create the agent with access to both tools
       try {
         console.log('Creating Finance Agent...');
+        // Clear conversation history when uploading a new document
+        conversationHistory.length = 0;
+        
         agentExecutor = await createFinanceAgent(
           llm, 
-          () => vectorStore,
+          getVectorStore, // Pass the function that returns the current vector store
           conversationHistory
         );
         console.log('Finance Agent ready!');
@@ -232,15 +262,38 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
 
 // Updated RAG endpoint to use the tool
 app.post('/api/search', async (req, res) => {
+  console.log('[RouteHit] POST /api/search');
   const { query } = req.body || {};
-  if (!vectorStore) return res.status(400).json({ message: 'No document uploaded yet.' });
-  if (!query) return res.status(400).json({ message: 'Query is required.' });
-  if (!documentSearchTool) return res.status(500).json({ message: 'Document search tool not initialized.' });
+  
+  console.log("Search API called with query:", query);
+  console.log("Vector store status:", vectorStore ? "Available" : "Not available");
+  console.log("Document search tool status:", documentSearchTool ? "Available" : "Not available");
+  
+  if (!vectorStore) {
+    console.log("No vector store available");
+    return res.status(400).json({ message: 'No document uploaded yet.' });
+  }
+  
+  if (!query) {
+    console.log("No query provided");
+    return res.status(400).json({ message: 'Query is required.' });
+  }
+  
+  if (!documentSearchTool) {
+    console.log("Document search tool not initialized");
+    return res.status(500).json({ message: 'Document search tool not initialized.' });
+  }
+  
   try {
+    console.log("Calling document search tool with query:", query);
     const raw = await documentSearchTool._call(query);
+    console.log("Search result:", raw.substring(0, 100) + "...");
+    
     if (raw.startsWith('Error:')) {
+      console.log("Search error:", raw);
       return res.status(500).json({ message: 'RAG error', error: raw.substring(6).trim() });
     }
+    
     // Split answer and sources
     const parts = raw.split(/\n\nSOURCES:\n/);
     const answerText = parts[0];
@@ -248,62 +301,82 @@ app.post('/api/search', async (req, res) => {
     if (parts[1]) {
       sources = parts[1].split(/\n/).map((l,i)=>({ id: i+1, preview: l.replace(/^Source \d+ preview: /,'') }));
     }
+    
+    console.log("Returning search result with", sources.length, "sources");
     res.json({ message: 'RAG success', query, answer: answerText, sources });
   } catch (e) {
+    console.error('RAG failure:', e);
     res.status(500).json({ message: 'RAG failure', error: e.message });
   }
 });
 
 // Add a new route for agent queries
 app.post('/api/agent', async (req, res) => {
+  console.log('[RouteHit] POST /api/agent');
   try {
     const { query } = req.body;
-    
-    if (!query) {
-      return res.status(400).json({ message: 'Query is required.' });
-    }
-    
-    if (!agentExecutor) {
-      return res.status(400).json({ 
-        message: 'Agent not initialized. Please upload a document first.' 
-      });
-    }
-    
+    console.log('Agent API called with query:', query);
+    console.log('Agent executor status:', agentExecutor ? 'Available' : 'Not available');
+    console.log('Vector store status:', vectorStore ? 'Available' : 'Not available');
+
+    if (!query) return res.status(400).json({ message: 'Query is required.' });
+    if (!agentExecutor) return res.status(400).json({ message: 'Agent not initialized. Please upload a document first.' });
+    if (!vectorStore) return res.status(400).json({ message: 'No document data available. Please upload a document first.' });
+
     console.log(`Processing agent query: "${query}"`);
-    
-    // Execute the agent
-    const result = await agentExecutor.invoke({
-      input: query
-    });
-    
+    const result = await agentExecutor.invoke({ input: query });
     console.log('Agent execution complete');
-    
-    // Format and return the response
+
+    const skippedTools = !result.intermediateSteps || result.intermediateSteps.length === 0;
+    const outputText = result.output || '';
+    const looksLikeFallback = /need the (financial )?document/i.test(outputText) || /no (financial )?document (was )?provided/i.test(outputText);
+    let finalAnswer = outputText;
+    let toolSteps = result.intermediateSteps || [];
+    let fallbackApplied = false;
+
+    if ((skippedTools || looksLikeFallback) && vectorStore) {
+      console.log('[Agent] Missing tool usage or fallback detected; invoking direct document_search.');
+      try {
+        if (!documentSearchTool) {
+          documentSearchTool = new DocumentSearchTool(getVectorStore, llm, conversationHistory);
+        }
+        const raw = await documentSearchTool._call(query);
+        const parts = raw.split(/\n\nSOURCES:\n/);
+        finalAnswer = parts[0];
+        toolSteps = toolSteps.concat([{ action: { tool: 'document_search', toolInput: query }, observation: 'Executed fallback retrieval' }]);
+        fallbackApplied = true;
+      } catch (fbErr) {
+        console.warn('[Agent] Fallback retrieval failed:', fbErr.message);
+      }
+    }
+
+    conversationHistory.push({ query, answer: finalAnswer });
+    if (conversationHistory.length > 20) conversationHistory.splice(0, conversationHistory.length - 20);
+
     res.json({
-  message: 'Agent finished successfully!', // ✅ Correct message
+      message: 'Agent finished successfully!',
       query,
-      answer: result.output,
-      agentSteps: result.intermediateSteps?.map(step => ({
+      answer: finalAnswer,
+      skippedTools,
+      fallbackApplied,
+      agentSteps: toolSteps.map(step => ({
         action: step.action.tool,
-        input: step.action.toolInput, 
+        input: step.action.toolInput,
         output: step.observation
-      })) || []
+      }))
     });
-    
   } catch (error) {
     console.error('Agent error:', error);
-    res.status(500).json({ 
-      message: 'Error during agent execution',
-      error: error.message
-    });
+    res.status(500).json({ message: 'Error during agent execution', error: error.message });
   }
 });
 
 // Simple ping route to verify correct server instance
-app.get('/ping', (_req, res) => res.send('pong'));
+app.get('/ping', (_req, res) => { console.log('[RouteHit] /ping'); res.send('pong'); });
 
 // Route inventory (debug)
 app.get('/__routes', (_req, res) => {
+  console.log('[RouteHit] /__routes');
   const routes = [];
   app._router.stack.forEach(l => {
     if (l.route && l.route.path) {
@@ -322,6 +395,9 @@ function logRegisteredRoutes() {
       .filter(l => l.route && l.route.path)
       .map(l => `${Object.keys(l.route.methods).join(',').toUpperCase()} ${l.route.path}`);
     console.log('[RouteRegistry]', routes);
+    if (!routes.length) {
+      console.warn('[RouteRegistry] WARNING: No routes enumerated. Express 5 router layers may differ. Inspecting stack length:', stack.length);
+    }
   } catch (err) {
     console.warn('[RouteRegistry] unable to enumerate routes:', err.message);
   }
