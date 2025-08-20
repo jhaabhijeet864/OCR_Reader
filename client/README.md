@@ -1,73 +1,95 @@
-# Welcome to my project
+# Financial Document AI Assistant — Client
 
-## Project info
+This is the React frontend for the Financial Document AI Assistant project, designed for seamless interaction with the backend AI services for financial document analysis, Q&A, semantic search, and currency conversion.
 
-**URL**: https://lovable.dev/projects/5136878b-fd38-4140-8ab2-ef838c38804e
+## 🖥️ Technologies
 
-## How can I edit this code?
+- **React 18** (TypeScript)
+- **Vite**
+- **Tailwind CSS**
+- **shadcn/ui** (component library)
+- **React Query** (server state management)
+- **Spline** (3D background)
+- **Lucide React** (icons)
+- **Sonner** (notifications)
 
-There are several ways of editing your application.
+## 🗂️ Directory Structure
 
-**Use Lovable**
+```
+client/
+├── src/
+│   ├── assets/        # Images and static files
+│   ├── components/    # UI components
+│   ├── hooks/         # Custom React hooks
+│   ├── lib/           # Utilities and API functions
+│   ├── pages/         # App pages
+│   ├── index.css      # Global styles
+│   └── main.tsx       # App entry point
+├── public/            # Public assets
+└── vite.config.ts     # Vite configuration
+```
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/5136878b-fd38-4140-8ab2-ef838c38804e) and start prompting.
+## 🚀 Getting Started
 
-Changes made via Lovable will be committed automatically to this repo.
+### Prerequisites
 
-**Use your preferred IDE**
+- Node.js (v16 or higher)
+- npm or yarn
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Installation & Development
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+Clone the repository and install dependencies:
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+git clone https://github.com/jhaabhijeet864/financial-doc-agent.git
+cd financial-doc-agent/client
+npm install
+```
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+Start the development server:
 
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+```sh
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+The app will be available at [http://localhost:5173](http://localhost:5173).
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## 🛠️ Editing the Code
 
-**Use GitHub Codespaces**
+You can use any of the following approaches:
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+- **Your preferred IDE:** Clone, edit, and push changes.
+- **GitHub Web Editor:** Edit files directly in your browser.
+- **GitHub Codespaces:** Launch a cloud development environment from the GitHub UI.
 
-## What technologies are used for this project?
+## 🌐 Deployment
 
-This project is built with:
+The recommended way to deploy is to use your preferred hosting solution (e.g., Vercel, Netlify, or your own server).  
+Build the production assets:
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+```sh
+npm run build
+```
 
-## How can I deploy this project?
+Then serve the output in the `dist/` folder.
 
-Simply open [Lovable](https://lovable.dev/projects/5136878b-fd38-4140-8ab2-ef838c38804e) and click on Share -> Publish.
+## ⚡ Environment Variables
 
-## Can I connect a custom domain to my Lovable project?
+If your frontend requires API keys or custom configuration, use a `.env` file in the `client` directory.  
+See [Vite documentation](https://vitejs.dev/guide/env-and-mode.html) for details.
 
-Yes, you can!
+## 📄 Custom Domain (Optional)
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+If you use Lovable for deployment, you can set up a custom domain by navigating to Project > Settings > Domains in Lovable.
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+## 🤝 Contributing
+
+Contributions and improvements are welcome!  
+- Fork this repo
+- Create a feature branch
+- Submit a pull request
+
+---
+
+© 2025 Abhijeet Jha.  
+For issues, use [GitHub Issues](https://github.com/jhaabhijeet864/financial-doc-agent/issues).
